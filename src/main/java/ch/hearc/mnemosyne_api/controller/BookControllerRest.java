@@ -11,10 +11,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import ch.hearc.mnemosyne_api.model.BookRest;
+import ch.hearc.mnemosyne_api.model.log.LogType;
+import ch.hearc.mnemosyne_api.model.log.SimpleLog;
 import ch.hearc.mnemosyne_api.service.BookRestService;
+import ch.hearc.mnemosyne_api.service.ProducerService;
 
-
-@CrossOrigin /*(origins = "http://127.0.0.1:5173") */
+@CrossOrigin /* (origins = "http://127.0.0.1:5173") */
 @RestController
 @RequestMapping("/api")
 public class BookControllerRest {
@@ -22,40 +24,96 @@ public class BookControllerRest {
 	@Autowired
 	BookRestService bookService;
 
+	@Autowired
+	private ProducerService producerService;
+
 	@GetMapping(value = { "/books" })
 	public List<BookRest> getAllBooks() {
+		SimpleLog log = new SimpleLog(LogType.INFO, "GET /books", "Gets all the books");
+		producerService.send(log);
 		return bookService.getAllBooks();
 	}
 
 	// GET maintenant du coup
 	@GetMapping(value = { "/books/{id}" })
 	public BookRest getBook(@PathVariable("id") Long id) {
-		return bookService.getBookById(id);
+		try {
+			BookRest book = bookService.getBookById(id);
+			SimpleLog log = new SimpleLog(LogType.INFO, "GET /books/" + id, "Gets the book with id " + id);
+			producerService.send(log);
+			return book;
+		} catch (Exception e) {
+			SimpleLog log = new SimpleLog(LogType.ERROR, "GET /books/" + id, "Book with id " + id + " not found");
+			producerService.send(log);
+			return null;
+		}
 	}
 
 	@PostMapping(value = { "/books/new" })
 	public String newBook(@RequestBody BookRest book) {
-		bookService.addBookToLibrary(book);
-		return "Book " + book.getName() + " inserted";
+		try {
+
+			bookService.addBookToLibrary(book);
+			SimpleLog log = new SimpleLog(LogType.INFO, "POST /books/new", "Book " + book.getName() + " inserted");
+			producerService.send(log);
+			return "Book " + book.getName() + " inserted";
+		} catch (Exception e) {
+			SimpleLog log = new SimpleLog(LogType.ERROR, "POST /books/new", "Book " + book.getName() + " not inserted");
+			producerService.send(log);
+			return "Book " + book.getName() + " not inserted";
+		}
 	}
 
 	@PostMapping(value = { "/books/delete/{id}" })
 	public String deleteBook(@PathVariable("id") Long id) {
-		BookRest book = bookService.getBookById(id);
-		bookService.deleteBookById(id);
-		return "Book " + book.getName() + " deleted";
+		try {
+
+			BookRest book = bookService.getBookById(id);
+			bookService.deleteBookById(id);
+			SimpleLog log = new SimpleLog(LogType.INFO, "POST /books/delete/" + id,
+					"Book " + book.getName() + " deleted");
+			producerService.send(log);
+			return "Book " + book.getName() + " deleted";
+		} catch (Exception e) {
+			SimpleLog log = new SimpleLog(LogType.ERROR, "POST /books/delete/" + id,
+					"Book with id " + id + " not found");
+			producerService.send(log);
+			return "Book with id " + id + " not found";
+		}
 	}
 
 	@PostMapping(value = "/books/update/{id}")
 	public String updateBook(@PathVariable("id") Long id, @RequestBody BookRest newBook) {
-		BookRest oldBook = bookService.getBookById(id);
-		String oldName = oldBook.getName();
-		bookService.updateBookById(id, newBook);
-		return "Book " + oldName + " updated to " + newBook.getName();
+		try {
+
+			BookRest oldBook = bookService.getBookById(id);
+			String oldName = oldBook.getName();
+			bookService.updateBookById(id, newBook);
+			SimpleLog log = new SimpleLog(LogType.INFO, "POST /books/update/" + id,
+					"Book " + oldName + " updated to " + newBook.getName());
+			producerService.send(log);
+			return "Book " + oldName + " updated to " + newBook.getName();
+		} catch (Exception e) {
+			SimpleLog log = new SimpleLog(LogType.ERROR, "POST /books/update/" + id,
+					"Book with id " + id + " not found");
+			producerService.send(log);
+			return "Book with id " + id + " not found";
+		}
 	}
 
-	@PostMapping(value="/books/find/{searchTerm}")
+	@PostMapping(value = "/books/find/{searchTerm}")
 	public List<BookRest> findBook(@PathVariable("searchTerm") String searchTerm) {
-		return bookService.findBook(searchTerm);
+		try {
+			List<BookRest> books = bookService.findBook(searchTerm);
+			SimpleLog log = new SimpleLog(LogType.INFO, "POST /books/find/" + searchTerm,
+					"Books found with search term " + searchTerm);
+			producerService.send(log);
+			return books;
+		} catch (Exception e) {
+			SimpleLog log = new SimpleLog(LogType.ERROR, "POST /books/find/" + searchTerm,
+					"Books not found with search term " + searchTerm);
+			producerService.send(log);
+			return null;
+		}
 	}
 }
